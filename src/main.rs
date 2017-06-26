@@ -6,7 +6,7 @@ use std::io::{self,Read};
 
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
-fn translate_markdown(text: &str, opts: Options) {
+fn translate(text: &str, buf: &mut String) {
     let mut footnote_def_num = 0;
     let mut footnote_ref_num = 0;
 
@@ -14,38 +14,39 @@ fn translate_markdown(text: &str, opts: Options) {
     let mut in_ordered_list = false;
     let mut in_unordered_list = false;
 
+    let opts = Options::empty();
     let p = Parser::new_ext(text, opts);
     for event in p {
         match event {
             Event::Start(tag) => {
                 match tag {
-                    Tag::BlockQuote => print!("{{quote}}\n"),
-                    Tag::Code => print!("{{{{"),
+                    Tag::BlockQuote => buf.push_str("{{quote}}\n"),
+                    Tag::Code => buf.push_str("{{{{"),
                     Tag::CodeBlock(lang) => {
                         if lang.is_empty() {
-                            print!("{{code}}\n");
+                            buf.push_str("{{code}}\n");
                         } else {
-                            print!("{{code:{}}}\n", lang);
+                            buf.push_str(&*format!("{{code:{}}}\n", lang));
                         }
                     },
-                    Tag::Emphasis => print!("_"),
+                    Tag::Emphasis => buf.push_str("_"),
                     Tag::FootnoteDefinition(_name) => {
-                        print!("[{}]", footnote_def_num);
+                        buf.push_str(&*format!("[{}]", footnote_def_num));
                         footnote_def_num += 1;
                     },
-                    Tag::Header(level) => print!("h{}. ", level),
+                    Tag::Header(level) => buf.push_str(&*format!("h{}. ", level)),
                     Tag::Image(dest, _title) => {
-                        print!("!{}!", dest);
+                        buf.push_str(&*format!("!{}!", dest));
                         in_image = true;
                     },
                     Tag::Item => {
                         if in_ordered_list {
-                            print!("# ");
+                            buf.push_str("# ");
                         } else if in_unordered_list {
-                            print!("* ");
+                            buf.push_str("* ");
                         }
                     },
-                    Tag::Link(_dest, _title) => print!("["),
+                    Tag::Link(_dest, _title) => buf.push_str("["),
                     Tag::List(None) => {
                         in_unordered_list = true;
                     },
@@ -54,8 +55,8 @@ fn translate_markdown(text: &str, opts: Options) {
                     },
                     Tag::Paragraph => (),
                     // Four dashes instead of three. Way to show your clever individuality Atlassian!
-                    Tag::Rule => print!("----\n\n"),
-                    Tag::Strong => print!("*"),
+                    Tag::Rule => buf.push_str("----\n\n"),
+                    Tag::Strong => buf.push_str("*"),
 
                     // Sorry, tables not handled at all right now.
                     Tag::Table(_align) => (),
@@ -64,56 +65,71 @@ fn translate_markdown(text: &str, opts: Options) {
             }
             Event::End(tag) => {
                 match tag {
-                    Tag::BlockQuote => print!("{{quote}}\n\n"),
-                    Tag::Code => print!("}}}}"),
-                    Tag::CodeBlock(_lang) => print!("{{code}}\n\n"),
-                    Tag::Emphasis => print!("_"),
+                    Tag::BlockQuote => buf.push_str("{{quote}}\n\n"),
+                    Tag::Code => buf.push_str("}}}}"),
+                    Tag::CodeBlock(_lang) => buf.push_str("{{code}}\n\n"),
+                    Tag::Emphasis => buf.push_str("_"),
                     Tag::FootnoteDefinition(_name) => (),
-                    Tag::Header(_level) => print!("\n\n"),
+                    Tag::Header(_level) => buf.push_str("\n\n"),
                     Tag::Image(_dest, _title) => {
                         in_image = false;
                     },
-                    Tag::Item => print!("\n"),
-                    Tag::Link(dest, _title) => print!("|{}]", dest),
+                    Tag::Item => buf.push_str("\n"),
+                    Tag::Link(dest, _title) => buf.push_str(&*format!("|{}]", dest)),
                     Tag::List(None) => {
                         in_unordered_list = false;
-                        print!("\n");
+                        buf.push_str("\n");
                     },
                     Tag::List(_count) => {
                         in_ordered_list = false;
-                        print!("\n");
+                        buf.push_str("\n");
                     },
                     Tag::Rule => (),
-                    Tag::Paragraph => print!("\n\n"),
-                    Tag::Strong => print!("*"),
+                    Tag::Paragraph => buf.push_str("\n\n"),
+                    Tag::Strong => buf.push_str("*"),
                     Tag::Table(_align) => (),
                     Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
                 };
             },
             Event::FootnoteReference(_name) => {
-                print!("[{}]", footnote_ref_num);
+                buf.push_str(&*format!("[{}]", footnote_ref_num));
                 footnote_ref_num += 1;
             },
             Event::Html(content) |
             Event::InlineHtml(content) |
             Event::Text(content) => {
-                // Image titles come out rendered as text rather than as an attribute for an image tag, so we need to special case them so as not to print.
+                // Image titles come out rendered as text rather than as an
+                // attribute for an image tag, so we need to special case them
+                // so as not to print.
                 if !in_image {
-                    print!("{}", content);
+                    buf.push_str(&*format!("{}", content));
                 }
             },
-            Event::HardBreak => print!("\n\n"),
-            Event::SoftBreak => print!("\n"),
+            Event::HardBreak => buf.push_str("\n\n"),
+            Event::SoftBreak => buf.push_str("\n"),
 
         }
     }
 }
 
 fn main() {
-    let opts = Options::empty();
     let mut input = String::new();
     if let Err(why) = io::stdin().read_to_string(&mut input) {
         panic!("couldn't read from stdin: {}", why)
     }
-    translate_markdown(&input, opts);
+    let mut buf = String::with_capacity(input.len());
+    translate(&input, &mut buf);
+    print!("{}", buf);
+}
+
+#[test]
+fn test_transate() {
+    let input = r##"# Title One
+"##;
+    let expected = r##"h1. Title One
+
+"##;
+    let mut buf = String::with_capacity(input.len());
+    translate(&input, &mut buf);
+    assert_eq!(expected, buf);
 }
