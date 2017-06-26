@@ -1,4 +1,4 @@
-# cmark2jira
+# cmark2jira [![Build Status](https://travis-ci.org/brandur/cmark2jira.svg?branch=master)](https://travis-ci.org/brandur/cmark2jira)
 
 Translate good CommonMark (Markdown) into bad JIRA markup
 for anyone locked into Atlassian's prison of bad software.
@@ -40,4 +40,4 @@ nnoremap <Leader>ji :call ToJIRA()<CR>
 ```
 
 I then make my way over to a browser tab with JIRA open and
-paste it with `Cmd+V`.
+paste with `Cmd+V`.
