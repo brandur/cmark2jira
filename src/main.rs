@@ -1,4 +1,7 @@
-//! HTML renderer that takes an iterator of events as input.
+//! A very simple program that reads CommonMark (Markdown) content from stdin,
+//! translates it to JIRA's special markup language, and prints the result on
+//! stdout. This is useful for enabling Vim-based workflows that allows users
+//! of Atlassian software to work purely with Markdown.
 
 extern crate pulldown_cmark;
 
