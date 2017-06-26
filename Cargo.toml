@@ -1,11 +1,13 @@
 [package]
 name = "cmark2jira"
 version = "0.2.0"
-authors = ["Brandur <brandur@mutelight.org>"]
 
-description = "Translate good CommonMark into bad JIRA markup for anyone locked into Atlassian's prison of bad software."
+authors = ["Brandur <brandur@mutelight.org>"]
+description = "Translate good CommonMark into bad JIRA markup."
+homepage = "https://github.com/brandur/cmark2jira"
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/brandur/cmark2jira"
 
 [dependencies]
 pulldown-cmark = { version = "0.0.15", default-features = false }
