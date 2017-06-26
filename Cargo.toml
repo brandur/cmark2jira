@@ -1,5 +1,5 @@
 [package]
-name = "commonmark2jira"
+name = "cmark2jira"
 version = "0.1.0"
 authors = ["Brandur <brandur@mutelight.org>"]
 
