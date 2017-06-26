@@ -1,17 +1,18 @@
 # cmark2jira [![Build Status](https://travis-ci.org/brandur/cmark2jira.svg?branch=master)](https://travis-ci.org/brandur/cmark2jira)
 
-Translate good CommonMark (Markdown) into bad JIRA markup
-for anyone locked into Atlassian's prison of bad software.
+Translate good CommonMark (Markdown) into bad JIRA markup.
+This may be useful for anyone locked into Atlassian's
+prison of bad software.
 
 Functionality is very minimal. It reads CommonMark from
-stdin and prints the converted content on stdout:
+`stdin` and prints the converted content on `stdout`:
 
 ``` sh
 cargo install
 echo "*markdown!*" | cmark2jira
 ```
 
-## Workflow
+## Vim Workflow
 
 I have Vim setup so that I can easily pop open a new tab
 containing an ephemeral file where I can write a comment
