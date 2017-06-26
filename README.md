@@ -8,7 +8,7 @@ Functionality is very minimal. It reads CommonMark from
 `stdin` and prints the converted content on `stdout`:
 
 ``` sh
-cargo install
+cargo install cmark2jira
 echo "*markdown!*" | cmark2jira
 ```
 
