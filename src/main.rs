@@ -72,19 +72,18 @@ fn translate(text: &str, buf: &mut String) {
             Event::End(tag) => {
                 match tag {
                     Tag::BlockQuote => {
-                        fresh_line(buf);
-                        buf.push_str("{quote}\n\n")
+                        buf.push_str("{quote}\n\n");
                     },
                     Tag::Code => buf.push_str("}}"),
                     Tag::CodeBlock(_lang) => {
                         fresh_line(buf);
-                        buf.push_str("{code}\n\n")
+                        buf.push_str("{code}\n\n");
                     },
                     Tag::Emphasis => buf.push_str("_"),
                     Tag::FootnoteDefinition(_name) => (),
                     Tag::Header(_level) => {
                         fresh_line(buf);
-                        buf.push_str("\n")
+                        buf.push_str("\n");
                     },
                     Tag::Image(_dest, _title) => {
                         in_image = false;
@@ -94,17 +93,17 @@ fn translate(text: &str, buf: &mut String) {
                     Tag::List(None) => {
                         in_unordered_list = false;
                         fresh_line(buf);
-                        buf.push_str("\n")
+                        buf.push_str("\n");
                     },
                     Tag::List(_count) => {
                         in_ordered_list = false;
                         fresh_line(buf);
-                        buf.push_str("\n")
+                        buf.push_str("\n");
                     },
                     Tag::Rule => (),
                     Tag::Paragraph => {
                         fresh_line(buf);
-                        buf.push_str("\n")
+                        buf.push_str("\n");
                     },
                     Tag::Strong => buf.push_str("*"),
                     Tag::Table(_align) => (),
