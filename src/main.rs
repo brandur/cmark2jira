@@ -14,8 +14,6 @@ struct JIRARenderer<'a> {
     pub buf: &'a mut String,
     pub input: &'a str,
 
-    footnote_def_num: i64,
-    footnote_ref_num: i64,
     in_image: bool,
     in_ordered_list: bool,
     in_unordered_list: bool,
@@ -77,11 +75,6 @@ impl<'a> JIRARenderer<'a> {
         match event {
             Event::Start(tag) => self.process_event_start(tag),
             Event::End(tag) => self.process_event_end(tag),
-            Event::FootnoteReference(_name) => {
-                let num = self.footnote_ref_num;
-                self.append(&*format!("[{}]", num));
-                self.footnote_ref_num += 1;
-            },
             Event::Html(content) |
             Event::InlineHtml(content) |
             Event::Text(content) => {
@@ -94,6 +87,12 @@ impl<'a> JIRARenderer<'a> {
             },
             Event::HardBreak => self.ensure_double_space(),
             Event::SoftBreak => self.ensure_single_space(),
+
+            // Tables and footnotes need to be specially enabled in the
+            // CommonMark parser. We have them set to just pass through as
+            // text, so these events can all be safely ignored (see the tests
+            // below).
+            Event::FootnoteReference(_name) => (),
         }
     }
 
@@ -113,11 +112,6 @@ impl<'a> JIRARenderer<'a> {
                 self.ensure_single_space();
             },
             Tag::Emphasis => self.append("_"),
-            Tag::FootnoteDefinition(_name) => {
-                let num = self.footnote_def_num;
-                self.append(&*format!("[{}]", num));
-                self.footnote_def_num += 1;
-            },
             Tag::Header(level) => self.append(&*format!("h{}. ", level)),
             Tag::Image(dest, _title) => {
                 self.append(&*format!("!{}!", dest));
@@ -145,7 +139,11 @@ impl<'a> JIRARenderer<'a> {
             },
             Tag::Strong => self.append("*"),
 
-            // Sorry, tables not handled at all right now.
+            // Tables and footnotes need to be specially enabled in the
+            // CommonMark parser. We have them set to just pass through as
+            // text, so these events can all be safely ignored (see the tests
+            // below).
+            Tag::FootnoteDefinition(_name) => (),
             Tag::Table(_align) => (),
             Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
         }
@@ -164,7 +162,6 @@ impl<'a> JIRARenderer<'a> {
                 self.ensure_double_space();
             },
             Tag::Emphasis => self.append("_"),
-            Tag::FootnoteDefinition(_name) => (),
             Tag::Header(_level) => {
                 self.ensure_double_space();
             },
@@ -186,6 +183,12 @@ impl<'a> JIRARenderer<'a> {
             Tag::Rule => (),
             Tag::Paragraph => self.ensure_double_space(),
             Tag::Strong => self.append("*"),
+
+            // Tables and footnotes need to be specially enabled in the
+            // CommonMark parser. We have them set to just pass through as
+            // text, so these events can all be safely ignored (see the tests
+            // below).
+            Tag::FootnoteDefinition(_name) => (),
             Tag::Table(_align) => (),
             Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
         };
@@ -198,8 +201,6 @@ fn render(s: &str) -> String {
     {
         let mut renderer = JIRARenderer {
             buf: &mut buf,
-            footnote_def_num: 0,
-            footnote_ref_num: 0,
             in_image: false,
             in_ordered_list: false,
             in_unordered_list: false,
@@ -359,4 +360,25 @@ end
     println!("*** expected ***\n{}", expected);
     println!("*** actual ***\n{}", actual);
     assert_eq!(expected, actual);
+}
+
+#[test]
+fn test_translate_ignores_footnotes() {
+    let input = r##"This is a paragraph of content [1] with a footnote.
+
+[1] This is the footnote definition."##;
+    let expected = input;
+    assert_eq!(expected, render(input));
+}
+
+#[test]
+fn test_translate_ignores_tables() {
+    let input = r##"This is some CommonMark content with a table.
+
+| Header  | Another header |
+|---------|----------------|
+| field 1 | something      |
+| field 2 | something else |"##;
+    let expected = input;
+    assert_eq!(expected, render(input));
 }
