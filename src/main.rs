@@ -158,6 +158,7 @@ impl<'a> JIRARenderer<'a> {
             },
             Tag::Code => self.append("}}"),
             Tag::CodeBlock(_lang) => {
+                self.ensure_single_space();
                 self.append("{code}");
                 self.ensure_double_space();
             },
