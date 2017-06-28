@@ -9,21 +9,22 @@ use std::io::{self,Read};
 
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
+/// Renderer that converts input CommonMark to output Jira markup.
 struct JIRARenderer<'a> {
     pub buf: &'a mut String,
+    pub input: &'a str,
 
     footnote_def_num: i64,
     footnote_ref_num: i64,
     in_image: bool,
     in_ordered_list: bool,
     in_unordered_list: bool,
-    input: &'a str,
     num_queued_newlines: i64,
 }
 
 impl<'a> JIRARenderer<'a> {
-    // Runs the renderer and converts input CommonMark to output Jira markup.
-    // The result is left in buf.
+    /// Runs the renderer and converts input CommonMark to output Jira markup.
+    /// The result is left in buf.
     pub fn run(&mut self) {
         let opts = Options::empty();
         let p = Parser::new_ext(self.input, opts);
@@ -32,19 +33,28 @@ impl<'a> JIRARenderer<'a> {
         }
     }
 
+    // Appends content to buf after first adding any newlines that are queued
+    // to be appended beforehand.
     fn append(&mut self, s: &str) {
-        if self.num_queued_newlines > 0 {
-            if !(self.buf.is_empty() || self.buf.ends_with('\n')) {
+        match self.num_queued_newlines {
+            0 => (),
+            1 => self.append_newline_if_not_present(),
+            2 => {
+                self.append_newline_if_not_present();
                 self.buf.push('\n');
-            }
-            self.num_queued_newlines -= 1;
-
-            for _i in 0..self.num_queued_newlines {
-                self.buf.push('\n');
-                self.num_queued_newlines -= 1;
-            }
+            },
+            _ => panic!("No more than two newlines should ever be queued"),
         }
+        self.num_queued_newlines = 0;
         self.buf.push_str(s);
+    }
+
+    // Appends a newline to buf, but only if it doesn't already end with a
+    // newline.
+    fn append_newline_if_not_present(&mut self) {
+        if !(self.buf.is_empty() || self.buf.ends_with('\n')) {
+            self.buf.push('\n');
+        }
     }
 
     // Queues up a single newline to be written into the buffer. A newline is
@@ -182,6 +192,7 @@ impl<'a> JIRARenderer<'a> {
     }
 }
 
+/// Renders an input CommonMark string to output JIRA markup.
 fn render(s: &str) -> String {
     let mut buf = String::with_capacity(s.len());
     {
