@@ -21,7 +21,7 @@ by pressing `<leader>co`:
 ``` vim
 function! NewComment()
     let r = strftime("%Y-%m-%d_%H-%M-%S")
-    execute "edit ~/Dropbox/notes/comments/blob_" . fnameescape(r) .  ".md"
+    execute "edit ~/comments/blob_" . fnameescape(r) .  ".md"
 endfunction
 
 nnoremap <Leader>co :call NewComment()<CR>
