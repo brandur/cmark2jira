@@ -221,14 +221,14 @@ fn main() {
 }
 
 #[test]
-fn test_translate_basic() {
+fn test_render_basic() {
     let input = r##"# Title One"##;
     let expected = r##"h1. Title One"##;
     assert_eq!(expected, render(input));
 }
 
 #[test]
-fn test_translate_complex() {
+fn test_render_complex() {
     let input = r##"# Title One
 
 This is a sample paragraph that has some text which is *emphasized* and some
@@ -363,7 +363,7 @@ end
 }
 
 #[test]
-fn test_translate_ignores_footnotes() {
+fn test_render_ignores_footnotes() {
     let input = r##"This is a paragraph of content [1] with a footnote.
 
 [1] This is the footnote definition."##;
@@ -372,7 +372,7 @@ fn test_translate_ignores_footnotes() {
 }
 
 #[test]
-fn test_translate_ignores_tables() {
+fn test_render_ignores_tables() {
     let input = r##"This is some CommonMark content with a table.
 
 | Header  | Another header |
