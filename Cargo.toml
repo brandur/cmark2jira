@@ -1,6 +1,6 @@
 [package]
 name = "cmark2jira"
-version = "0.3.0"
+version = "0.4.0"
 
 authors = ["Brandur <brandur@mutelight.org>"]
 description = "Translate good CommonMark into bad JIRA markup."
