@@ -9,127 +9,158 @@ use std::io::{self,Read};
 
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
-fn fresh_line(buf: &mut String) {
-    if !(buf.is_empty() || buf.ends_with('\n')) {
-        buf.push('\n');
-    }
+struct JIRARenderer<'a> {
+    buf: &'a mut String,
+    input: &'a str,
+    num_queued_newlines: i64,
 }
 
-fn translate(text: &str, buf: &mut String) {
-    let mut footnote_def_num = 0;
-    let mut footnote_ref_num = 0;
+impl<'a> JIRARenderer<'a> {
+    fn append(&mut self, s: &str) {
+        if self.num_queued_newlines > 0 {
+            self.fresh_line();
+            self.num_queued_newlines -= 1;
 
-    let mut in_image = false;
-    let mut in_ordered_list = false;
-    let mut in_unordered_list = false;
-
-    let opts = Options::empty();
-    let p = Parser::new_ext(text, opts);
-    for event in p {
-        match event {
-            Event::Start(tag) => {
-                match tag {
-                    Tag::BlockQuote => buf.push_str("{quote}\n"),
-                    Tag::Code => buf.push_str("{{"),
-                    Tag::CodeBlock(lang) => {
-                        if lang.is_empty() {
-                            buf.push_str("{code}\n");
-                        } else {
-                            buf.push_str(&*format!("{{code:{}}}\n", lang));
-                        }
-                    },
-                    Tag::Emphasis => buf.push_str("_"),
-                    Tag::FootnoteDefinition(_name) => {
-                        buf.push_str(&*format!("[{}]", footnote_def_num));
-                        footnote_def_num += 1;
-                    },
-                    Tag::Header(level) => buf.push_str(&*format!("h{}. ", level)),
-                    Tag::Image(dest, _title) => {
-                        buf.push_str(&*format!("!{}!", dest));
-                        in_image = true;
-                    },
-                    Tag::Item => {
-                        if in_ordered_list {
-                            buf.push_str("# ");
-                        } else if in_unordered_list {
-                            buf.push_str("* ");
-                        }
-                    },
-                    Tag::Link(_dest, _title) => buf.push_str("["),
-                    Tag::List(None) => {
-                        in_unordered_list = true;
-                    },
-                    Tag::List(_count) => {
-                        in_ordered_list = true;
-                    },
-                    Tag::Paragraph => (),
-                    // Four dashes instead of three. Way to show your clever individuality Atlassian!
-                    Tag::Rule => buf.push_str("----\n\n"),
-                    Tag::Strong => buf.push_str("*"),
-
-                    // Sorry, tables not handled at all right now.
-                    Tag::Table(_align) => (),
-                    Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
-                };
+            for _i in 0..self.num_queued_newlines {
+                self.buf.push('\n');
+                self.num_queued_newlines -= 1;
             }
-            Event::End(tag) => {
-                match tag {
-                    Tag::BlockQuote => {
-                        buf.push_str("{quote}\n\n");
-                    },
-                    Tag::Code => buf.push_str("}}"),
-                    Tag::CodeBlock(_lang) => {
-                        fresh_line(buf);
-                        buf.push_str("{code}\n\n");
-                    },
-                    Tag::Emphasis => buf.push_str("_"),
-                    Tag::FootnoteDefinition(_name) => (),
-                    Tag::Header(_level) => {
-                        fresh_line(buf);
-                        buf.push_str("\n");
-                    },
-                    Tag::Image(_dest, _title) => {
-                        in_image = false;
-                    },
-                    Tag::Item => fresh_line(buf),
-                    Tag::Link(dest, _title) => buf.push_str(&*format!("|{}]", dest)),
-                    Tag::List(None) => {
-                        in_unordered_list = false;
-                        fresh_line(buf);
-                        buf.push_str("\n");
-                    },
-                    Tag::List(_count) => {
-                        in_ordered_list = false;
-                        fresh_line(buf);
-                        buf.push_str("\n");
-                    },
-                    Tag::Rule => (),
-                    Tag::Paragraph => {
-                        fresh_line(buf);
-                        buf.push_str("\n");
-                    },
-                    Tag::Strong => buf.push_str("*"),
-                    Tag::Table(_align) => (),
-                    Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
-                };
-            },
-            Event::FootnoteReference(_name) => {
-                buf.push_str(&*format!("[{}]", footnote_ref_num));
-                footnote_ref_num += 1;
-            },
-            Event::Html(content) |
-            Event::InlineHtml(content) |
-            Event::Text(content) => {
-                // Image titles come out rendered as text rather than as an
-                // attribute for an image tag, so we need to special case them
-                // so as not to print.
-                if !in_image {
-                    buf.push_str(&*format!("{}", content));
-                }
-            },
-            Event::HardBreak => buf.push_str("\n\n"),
-            Event::SoftBreak => buf.push_str("\n"),
+        }
+        self.buf.push_str(s);
+    }
 
+    fn fresh_line(&mut self) {
+        if !(self.buf.is_empty() || self.buf.ends_with('\n')) {
+            self.buf.push('\n');
+        }
+    }
+
+    fn run(&mut self) {
+        let mut footnote_def_num = 0;
+        let mut footnote_ref_num = 0;
+
+        let mut in_image = false;
+        let mut in_ordered_list = false;
+        let mut in_unordered_list = false;
+
+        let opts = Options::empty();
+        let p = Parser::new_ext(self.input, opts);
+        for event in p {
+            match event {
+                Event::Start(tag) => {
+                    match tag {
+                        Tag::BlockQuote => {
+                            self.append("{quote}");
+                            self.num_queued_newlines = 1;
+                        },
+                        Tag::Code => self.append("{{"),
+                        Tag::CodeBlock(lang) => {
+                            if lang.is_empty() {
+                                self.append("{code}");
+                            } else {
+                                self.append(&*format!("{{code:{}}}", lang));
+                            }
+                            self.num_queued_newlines = 1;
+                        },
+                        Tag::Emphasis => self.append("_"),
+                        Tag::FootnoteDefinition(_name) => {
+                            self.append(&*format!("[{}]", footnote_def_num));
+                            footnote_def_num += 1;
+                        },
+                        Tag::Header(level) => self.append(&*format!("h{}. ", level)),
+                        Tag::Image(dest, _title) => {
+                            self.append(&*format!("!{}!", dest));
+                            in_image = true;
+                        },
+                        Tag::Item => {
+                            if in_ordered_list {
+                                self.append("# ");
+                            } else if in_unordered_list {
+                                self.append("* ");
+                            }
+                        },
+                        Tag::Link(_dest, _title) => self.append("["),
+                        Tag::List(None) => {
+                            in_unordered_list = true;
+                        },
+                        Tag::List(_count) => {
+                            in_ordered_list = true;
+                        },
+                        Tag::Paragraph => (),
+                        // Four dashes instead of three. Way to show your clever individuality Atlassian!
+                        Tag::Rule => {
+                            self.append("----");
+                            self.num_queued_newlines = 2;
+                        },
+                        Tag::Strong => self.append("*"),
+
+                        // Sorry, tables not handled at all right now.
+                        Tag::Table(_align) => (),
+                        Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
+                    };
+                }
+                Event::End(tag) => {
+                    match tag {
+                        Tag::BlockQuote => {
+                            self.num_queued_newlines = 1;
+                            self.append("{quote}");
+                            self.num_queued_newlines = 2;
+                        },
+                        Tag::Code => self.append("}}"),
+                        Tag::CodeBlock(_lang) => {
+                            self.append("{code}");
+                            self.num_queued_newlines = 2;
+                        },
+                        Tag::Emphasis => self.append("_"),
+                        Tag::FootnoteDefinition(_name) => (),
+                        Tag::Header(_level) => {
+                            self.num_queued_newlines = 2;
+                        },
+                        Tag::Image(_dest, _title) => {
+                            in_image = false;
+                        },
+                        Tag::Item => {
+                            self.num_queued_newlines = 1;
+                        },
+                        Tag::Link(dest, _title) => self.append(&*format!("|{}]", dest)),
+                        Tag::List(None) => {
+                            in_unordered_list = false;
+                            self.num_queued_newlines = 2;
+                        },
+                        Tag::List(_count) => {
+                            in_ordered_list = false;
+                            self.num_queued_newlines = 2;
+                        },
+                        Tag::Rule => (),
+                        Tag::Paragraph => {
+                            self.num_queued_newlines = 2;
+                        },
+                        Tag::Strong => self.append("*"),
+                        Tag::Table(_align) => (),
+                        Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
+                    };
+                },
+                Event::FootnoteReference(_name) => {
+                    self.append(&*format!("[{}]", footnote_ref_num));
+                    footnote_ref_num += 1;
+                },
+                Event::Html(content) |
+                Event::InlineHtml(content) |
+                Event::Text(content) => {
+                    // Image titles come out rendered as text rather than as an
+                    // attribute for an image tag, so we need to special case them
+                    // so as not to print.
+                    if !in_image {
+                        self.append(&*format!("{}", content));
+                    }
+                },
+                Event::HardBreak => {
+                    self.num_queued_newlines = 2;
+                },
+                Event::SoftBreak => {
+                    self.num_queued_newlines = 1;
+                },
+            }
         }
     }
 }
@@ -139,21 +170,26 @@ fn main() {
     if let Err(why) = io::stdin().read_to_string(&mut input) {
         panic!("couldn't read from stdin: {}", why)
     }
-    let mut buf = String::with_capacity(input.len());
-    translate(&input, &mut buf);
-    print!("{}", buf);
+    let mut renderer = JIRARenderer {
+        buf: &mut String::with_capacity(input.len()),
+        input: &input,
+        num_queued_newlines: 0,
+    };
+    renderer.run();
+    print!("{}", renderer.buf);
 }
 
 #[test]
 fn test_translate_basic() {
-    let input = r##"# Title One
-"##;
-    let expected = r##"h1. Title One
-
-"##;
-    let mut buf = String::with_capacity(input.len());
-    translate(&input, &mut buf);
-    assert_eq!(expected, buf);
+    let input = r##"# Title One"##;
+    let expected = r##"h1. Title One"##;
+    let mut renderer = JIRARenderer {
+        buf: &mut String::with_capacity(input.len()),
+        input: &input,
+        num_queued_newlines: 0,
+    };
+    renderer.run();
+    assert_eq!(expected, renderer.buf);
 }
 
 #[test]
@@ -258,7 +294,6 @@ This is a single paragraph quote:
 
 {quote}
 Paragraph 1.
-
 {quote}
 
 And this is a multi-paragraph quote:
@@ -267,7 +302,6 @@ And this is a multi-paragraph quote:
 Paragraph 1.
 
 Paragraph 2.
-
 {quote}
 
 h2. Code
@@ -284,15 +318,17 @@ And here is one with a language:
 def foo
   puts "bar"
 end
-{code}
-
-"##;
-    let mut buf = String::with_capacity(input.len());
-    translate(&input, &mut buf);
+{code}"##;
+    let mut renderer = JIRARenderer {
+        buf: &mut String::with_capacity(input.len()),
+        input: &input,
+        num_queued_newlines: 0,
+    };
+    renderer.run();
 
     // note that these only print in the event of a failure
     println!("*** expected ***\n{}", expected);
-    println!("*** actual ***\n{}", buf);
+    println!("*** actual ***\n{}", renderer.buf);
 
-    assert_eq!(expected, buf);
+    assert_eq!(expected, renderer.buf);
 }
