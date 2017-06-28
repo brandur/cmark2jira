@@ -21,9 +21,19 @@ struct JIRARenderer<'a> {
 }
 
 impl<'a> JIRARenderer<'a> {
+    pub fn run(&mut self) {
+        let opts = Options::empty();
+        let p = Parser::new_ext(self.input, opts);
+        for event in p {
+            self.process_event(event);
+        }
+    }
+
     fn append(&mut self, s: &str) {
         if self.num_queued_newlines > 0 {
-            self.fresh_line();
+            if !(self.buf.is_empty() || self.buf.ends_with('\n')) {
+                self.buf.push('\n');
+            }
             self.num_queued_newlines -= 1;
 
             for _i in 0..self.num_queued_newlines {
@@ -34,134 +44,128 @@ impl<'a> JIRARenderer<'a> {
         self.buf.push_str(s);
     }
 
-    fn fresh_line(&mut self) {
-        if !(self.buf.is_empty() || self.buf.ends_with('\n')) {
-            self.buf.push('\n');
+    fn process_event(&mut self, event: Event) {
+        match event {
+            Event::Start(tag) => self.process_event_start(tag),
+            Event::End(tag) => self.process_event_end(tag),
+            Event::FootnoteReference(_name) => {
+                let num = self.footnote_ref_num;
+                self.append(&*format!("[{}]", num));
+                self.footnote_ref_num += 1;
+            },
+            Event::Html(content) |
+            Event::InlineHtml(content) |
+            Event::Text(content) => {
+                // Image titles come out rendered as text rather than as an
+                // attribute for an image tag, so we need to special case them
+                // so as not to print.
+                if !self.in_image {
+                    self.append(&*format!("{}", content));
+                }
+            },
+            Event::HardBreak => {
+                self.num_queued_newlines = 2;
+            },
+            Event::SoftBreak => {
+                self.num_queued_newlines = 1;
+            },
         }
     }
 
-    fn run(&mut self) {
-        let opts = Options::empty();
-        let p = Parser::new_ext(self.input, opts);
-        for event in p {
-            match event {
-                Event::Start(tag) => {
-                    match tag {
-                        Tag::BlockQuote => {
-                            self.append("{quote}");
-                            self.num_queued_newlines = 1;
-                        },
-                        Tag::Code => self.append("{{"),
-                        Tag::CodeBlock(lang) => {
-                            if lang.is_empty() {
-                                self.append("{code}");
-                            } else {
-                                self.append(&*format!("{{code:{}}}", lang));
-                            }
-                            self.num_queued_newlines = 1;
-                        },
-                        Tag::Emphasis => self.append("_"),
-                        Tag::FootnoteDefinition(_name) => {
-                            let num = self.footnote_def_num;
-                            self.append(&*format!("[{}]", num));
-                            self.footnote_def_num += 1;
-                        },
-                        Tag::Header(level) => self.append(&*format!("h{}. ", level)),
-                        Tag::Image(dest, _title) => {
-                            self.append(&*format!("!{}!", dest));
-                            self.in_image = true;
-                        },
-                        Tag::Item => {
-                            if self.in_ordered_list {
-                                self.append("# ");
-                            } else if self.in_unordered_list {
-                                self.append("* ");
-                            }
-                        },
-                        Tag::Link(_dest, _title) => self.append("["),
-                        Tag::List(None) => {
-                            self.in_unordered_list = true;
-                        },
-                        Tag::List(_count) => {
-                            self.in_ordered_list = true;
-                        },
-                        Tag::Paragraph => (),
-                        // Four dashes instead of three. Way to show your clever individuality Atlassian!
-                        Tag::Rule => {
-                            self.append("----");
-                            self.num_queued_newlines = 2;
-                        },
-                        Tag::Strong => self.append("*"),
-
-                        // Sorry, tables not handled at all right now.
-                        Tag::Table(_align) => (),
-                        Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
-                    };
+    fn process_event_start(&mut self, tag: Tag) {
+        match tag {
+            Tag::BlockQuote => {
+                self.append("{quote}");
+                self.num_queued_newlines = 1;
+            },
+            Tag::Code => self.append("{{"),
+            Tag::CodeBlock(lang) => {
+                if lang.is_empty() {
+                    self.append("{code}");
+                } else {
+                    self.append(&*format!("{{code:{}}}", lang));
                 }
-                Event::End(tag) => {
-                    match tag {
-                        Tag::BlockQuote => {
-                            self.num_queued_newlines = 1;
-                            self.append("{quote}");
-                            self.num_queued_newlines = 2;
-                        },
-                        Tag::Code => self.append("}}"),
-                        Tag::CodeBlock(_lang) => {
-                            self.append("{code}");
-                            self.num_queued_newlines = 2;
-                        },
-                        Tag::Emphasis => self.append("_"),
-                        Tag::FootnoteDefinition(_name) => (),
-                        Tag::Header(_level) => {
-                            self.num_queued_newlines = 2;
-                        },
-                        Tag::Image(_dest, _title) => {
-                            self.in_image = false;
-                        },
-                        Tag::Item => {
-                            self.num_queued_newlines = 1;
-                        },
-                        Tag::Link(dest, _title) => self.append(&*format!("|{}]", dest)),
-                        Tag::List(None) => {
-                            self.in_unordered_list = false;
-                            self.num_queued_newlines = 2;
-                        },
-                        Tag::List(_count) => {
-                            self.in_ordered_list = false;
-                            self.num_queued_newlines = 2;
-                        },
-                        Tag::Rule => (),
-                        Tag::Paragraph => {
-                            self.num_queued_newlines = 2;
-                        },
-                        Tag::Strong => self.append("*"),
-                        Tag::Table(_align) => (),
-                        Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
-                    };
-                },
-                Event::FootnoteReference(_name) => {
-                    let num = self.footnote_ref_num;
-                    self.append(&*format!("[{}]", num));
-                    self.footnote_ref_num += 1;
-                },
-                Event::Html(content) |
-                Event::InlineHtml(content) |
-                Event::Text(content) => {
-                    // Image titles come out rendered as text rather than as an
-                    // attribute for an image tag, so we need to special case them
-                    // so as not to print.
-                    if !self.in_image {
-                        self.append(&*format!("{}", content));
-                    }
-                },
-                Event::HardBreak => {
-                    self.num_queued_newlines = 2;
-                },
-                Event::SoftBreak => {
-                    self.num_queued_newlines = 1;
-                },
-            }
+                self.num_queued_newlines = 1;
+            },
+            Tag::Emphasis => self.append("_"),
+            Tag::FootnoteDefinition(_name) => {
+                let num = self.footnote_def_num;
+                self.append(&*format!("[{}]", num));
+                self.footnote_def_num += 1;
+            },
+            Tag::Header(level) => self.append(&*format!("h{}. ", level)),
+            Tag::Image(dest, _title) => {
+                self.append(&*format!("!{}!", dest));
+                self.in_image = true;
+            },
+            Tag::Item => {
+                if self.in_ordered_list {
+                    self.append("# ");
+                } else if self.in_unordered_list {
+                    self.append("* ");
+                }
+            },
+            Tag::Link(_dest, _title) => self.append("["),
+            Tag::List(None) => {
+                self.in_unordered_list = true;
+            },
+            Tag::List(_count) => {
+                self.in_ordered_list = true;
+            },
+            Tag::Paragraph => (),
+            // Four dashes instead of three. Way to show your clever individuality Atlassian!
+            Tag::Rule => {
+                self.append("----");
+                self.num_queued_newlines = 2;
+            },
+            Tag::Strong => self.append("*"),
+
+            // Sorry, tables not handled at all right now.
+            Tag::Table(_align) => (),
+            Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
         }
+    }
+
+    fn process_event_end(&mut self, tag: Tag) {
+        match tag {
+            Tag::BlockQuote => {
+                self.num_queued_newlines = 1;
+                self.append("{quote}");
+                self.num_queued_newlines = 2;
+            },
+            Tag::Code => self.append("}}"),
+            Tag::CodeBlock(_lang) => {
+                self.append("{code}");
+                self.num_queued_newlines = 2;
+            },
+            Tag::Emphasis => self.append("_"),
+            Tag::FootnoteDefinition(_name) => (),
+            Tag::Header(_level) => {
+                self.num_queued_newlines = 2;
+            },
+            Tag::Image(_dest, _title) => {
+                self.in_image = false;
+            },
+            Tag::Item => {
+                self.num_queued_newlines = 1;
+            },
+            Tag::Link(dest, _title) => self.append(&*format!("|{}]", dest)),
+            Tag::List(None) => {
+                self.in_unordered_list = false;
+                self.num_queued_newlines = 2;
+            },
+            Tag::List(_count) => {
+                self.in_ordered_list = false;
+                self.num_queued_newlines = 2;
+            },
+            Tag::Rule => (),
+            Tag::Paragraph => {
+                self.num_queued_newlines = 2;
+            },
+            Tag::Strong => self.append("*"),
+            Tag::Table(_align) => (),
+            Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
+        };
     }
 }
 
