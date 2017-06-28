@@ -165,31 +165,32 @@ impl<'a> JIRARenderer<'a> {
     }
 }
 
+fn render(s: &str) -> String {
+    let mut buf = String::with_capacity(s.len());
+    {
+        let mut renderer = JIRARenderer {
+            buf: &mut buf,
+            input: &s,
+            num_queued_newlines: 0,
+        };
+        renderer.run();
+    }
+    return buf;
+}
+
 fn main() {
     let mut input = String::new();
     if let Err(why) = io::stdin().read_to_string(&mut input) {
         panic!("couldn't read from stdin: {}", why)
     }
-    let mut renderer = JIRARenderer {
-        buf: &mut String::with_capacity(input.len()),
-        input: &input,
-        num_queued_newlines: 0,
-    };
-    renderer.run();
-    print!("{}", renderer.buf);
+    print!("{}", render(input.as_str()));
 }
 
 #[test]
 fn test_translate_basic() {
     let input = r##"# Title One"##;
     let expected = r##"h1. Title One"##;
-    let mut renderer = JIRARenderer {
-        buf: &mut String::with_capacity(input.len()),
-        input: &input,
-        num_queued_newlines: 0,
-    };
-    renderer.run();
-    assert_eq!(expected, renderer.buf);
+    assert_eq!(expected, render(input));
 }
 
 #[test]
@@ -319,16 +320,10 @@ def foo
   puts "bar"
 end
 {code}"##;
-    let mut renderer = JIRARenderer {
-        buf: &mut String::with_capacity(input.len()),
-        input: &input,
-        num_queued_newlines: 0,
-    };
-    renderer.run();
 
     // note that these only print in the event of a failure
+    let actual = render(input);
     println!("*** expected ***\n{}", expected);
-    println!("*** actual ***\n{}", renderer.buf);
-
-    assert_eq!(expected, renderer.buf);
+    println!("*** actual ***\n{}", actual);
+    assert_eq!(expected, actual);
 }
