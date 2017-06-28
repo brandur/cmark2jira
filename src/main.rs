@@ -11,6 +11,11 @@ use pulldown_cmark::{Event, Options, Parser, Tag};
 
 struct JIRARenderer<'a> {
     buf: &'a mut String,
+    footnote_def_num: i64,
+    footnote_ref_num: i64,
+    in_image: bool,
+    in_ordered_list: bool,
+    in_unordered_list: bool,
     input: &'a str,
     num_queued_newlines: i64,
 }
@@ -36,13 +41,6 @@ impl<'a> JIRARenderer<'a> {
     }
 
     fn run(&mut self) {
-        let mut footnote_def_num = 0;
-        let mut footnote_ref_num = 0;
-
-        let mut in_image = false;
-        let mut in_ordered_list = false;
-        let mut in_unordered_list = false;
-
         let opts = Options::empty();
         let p = Parser::new_ext(self.input, opts);
         for event in p {
@@ -64,27 +62,28 @@ impl<'a> JIRARenderer<'a> {
                         },
                         Tag::Emphasis => self.append("_"),
                         Tag::FootnoteDefinition(_name) => {
-                            self.append(&*format!("[{}]", footnote_def_num));
-                            footnote_def_num += 1;
+                            let num = self.footnote_def_num;
+                            self.append(&*format!("[{}]", num));
+                            self.footnote_def_num += 1;
                         },
                         Tag::Header(level) => self.append(&*format!("h{}. ", level)),
                         Tag::Image(dest, _title) => {
                             self.append(&*format!("!{}!", dest));
-                            in_image = true;
+                            self.in_image = true;
                         },
                         Tag::Item => {
-                            if in_ordered_list {
+                            if self.in_ordered_list {
                                 self.append("# ");
-                            } else if in_unordered_list {
+                            } else if self.in_unordered_list {
                                 self.append("* ");
                             }
                         },
                         Tag::Link(_dest, _title) => self.append("["),
                         Tag::List(None) => {
-                            in_unordered_list = true;
+                            self.in_unordered_list = true;
                         },
                         Tag::List(_count) => {
-                            in_ordered_list = true;
+                            self.in_ordered_list = true;
                         },
                         Tag::Paragraph => (),
                         // Four dashes instead of three. Way to show your clever individuality Atlassian!
@@ -117,18 +116,18 @@ impl<'a> JIRARenderer<'a> {
                             self.num_queued_newlines = 2;
                         },
                         Tag::Image(_dest, _title) => {
-                            in_image = false;
+                            self.in_image = false;
                         },
                         Tag::Item => {
                             self.num_queued_newlines = 1;
                         },
                         Tag::Link(dest, _title) => self.append(&*format!("|{}]", dest)),
                         Tag::List(None) => {
-                            in_unordered_list = false;
+                            self.in_unordered_list = false;
                             self.num_queued_newlines = 2;
                         },
                         Tag::List(_count) => {
-                            in_ordered_list = false;
+                            self.in_ordered_list = false;
                             self.num_queued_newlines = 2;
                         },
                         Tag::Rule => (),
@@ -141,8 +140,9 @@ impl<'a> JIRARenderer<'a> {
                     };
                 },
                 Event::FootnoteReference(_name) => {
-                    self.append(&*format!("[{}]", footnote_ref_num));
-                    footnote_ref_num += 1;
+                    let num = self.footnote_ref_num;
+                    self.append(&*format!("[{}]", num));
+                    self.footnote_ref_num += 1;
                 },
                 Event::Html(content) |
                 Event::InlineHtml(content) |
@@ -150,7 +150,7 @@ impl<'a> JIRARenderer<'a> {
                     // Image titles come out rendered as text rather than as an
                     // attribute for an image tag, so we need to special case them
                     // so as not to print.
-                    if !in_image {
+                    if !self.in_image {
                         self.append(&*format!("{}", content));
                     }
                 },
@@ -170,6 +170,11 @@ fn render(s: &str) -> String {
     {
         let mut renderer = JIRARenderer {
             buf: &mut buf,
+            footnote_def_num: 0,
+            footnote_ref_num: 0,
+            in_image: false,
+            in_ordered_list: false,
+            in_unordered_list: false,
             input: &s,
             num_queued_newlines: 0,
         };
