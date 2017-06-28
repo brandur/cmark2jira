@@ -42,3 +42,24 @@ nnoremap <Leader>ji :call ToJIRA()<CR>
 
 I then make my way over to a browser tab with JIRA open and
 paste with `Cmd+V`.
+
+## Development
+
+Run tests with:
+
+``` sh
+cargo test
+```
+
+### Release
+
+To release the package:
+
+``` sh
+vi Cargo.toml # bump version number
+cargo build # ensure that Cargo.lock gets updated
+git add Cargo.toml Cargo.lock
+git commit
+cargo package
+cargo publish
+```
