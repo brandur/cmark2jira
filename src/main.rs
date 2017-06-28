@@ -10,7 +10,8 @@ use std::io::{self,Read};
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
 struct JIRARenderer<'a> {
-    buf: &'a mut String,
+    pub buf: &'a mut String,
+
     footnote_def_num: i64,
     footnote_ref_num: i64,
     in_image: bool,
@@ -21,6 +22,8 @@ struct JIRARenderer<'a> {
 }
 
 impl<'a> JIRARenderer<'a> {
+    // Runs the renderer and converts input CommonMark to output Jira markup.
+    // The result is left in buf.
     pub fn run(&mut self) {
         let opts = Options::empty();
         let p = Parser::new_ext(self.input, opts);
@@ -44,6 +47,22 @@ impl<'a> JIRARenderer<'a> {
         self.buf.push_str(s);
     }
 
+    // Queues up a single newline to be written into the buffer. A newline is
+    // only appended in the case more content is added to the buffer so that
+    // subsequent calls can control that spacing and so that we're not left
+    // with trailing whitespace when we finish rendering.
+    fn ensure_double_space(&mut self) {
+        self.num_queued_newlines = 2;
+    }
+
+    // Queues up a double newline to be written into the buffer. Newlines are
+    // only appended in the case more content is added to the buffer so that
+    // subsequent calls can control that spacing and so that we're not left
+    // with trailing whitespace when we finish rendering.
+    fn ensure_single_space(&mut self) {
+        self.num_queued_newlines = 1;
+    }
+
     fn process_event(&mut self, event: Event) {
         match event {
             Event::Start(tag) => self.process_event_start(tag),
@@ -63,12 +82,8 @@ impl<'a> JIRARenderer<'a> {
                     self.append(&*format!("{}", content));
                 }
             },
-            Event::HardBreak => {
-                self.num_queued_newlines = 2;
-            },
-            Event::SoftBreak => {
-                self.num_queued_newlines = 1;
-            },
+            Event::HardBreak => self.ensure_double_space(),
+            Event::SoftBreak => self.ensure_single_space(),
         }
     }
 
@@ -76,7 +91,7 @@ impl<'a> JIRARenderer<'a> {
         match tag {
             Tag::BlockQuote => {
                 self.append("{quote}");
-                self.num_queued_newlines = 1;
+                self.ensure_single_space();
             },
             Tag::Code => self.append("{{"),
             Tag::CodeBlock(lang) => {
@@ -85,7 +100,7 @@ impl<'a> JIRARenderer<'a> {
                 } else {
                     self.append(&*format!("{{code:{}}}", lang));
                 }
-                self.num_queued_newlines = 1;
+                self.ensure_single_space();
             },
             Tag::Emphasis => self.append("_"),
             Tag::FootnoteDefinition(_name) => {
@@ -129,39 +144,37 @@ impl<'a> JIRARenderer<'a> {
     fn process_event_end(&mut self, tag: Tag) {
         match tag {
             Tag::BlockQuote => {
-                self.num_queued_newlines = 1;
+                self.ensure_single_space();
                 self.append("{quote}");
-                self.num_queued_newlines = 2;
+                self.ensure_double_space();
             },
             Tag::Code => self.append("}}"),
             Tag::CodeBlock(_lang) => {
                 self.append("{code}");
-                self.num_queued_newlines = 2;
+                self.ensure_double_space();
             },
             Tag::Emphasis => self.append("_"),
             Tag::FootnoteDefinition(_name) => (),
             Tag::Header(_level) => {
-                self.num_queued_newlines = 2;
+                self.ensure_double_space();
             },
             Tag::Image(_dest, _title) => {
                 self.in_image = false;
             },
             Tag::Item => {
-                self.num_queued_newlines = 1;
+                self.ensure_single_space();
             },
             Tag::Link(dest, _title) => self.append(&*format!("|{}]", dest)),
             Tag::List(None) => {
                 self.in_unordered_list = false;
-                self.num_queued_newlines = 2;
+                self.ensure_double_space();
             },
             Tag::List(_count) => {
                 self.in_ordered_list = false;
-                self.num_queued_newlines = 2;
+                self.ensure_double_space();
             },
             Tag::Rule => (),
-            Tag::Paragraph => {
-                self.num_queued_newlines = 2;
-            },
+            Tag::Paragraph => self.ensure_double_space(),
             Tag::Strong => self.append("*"),
             Tag::Table(_align) => (),
             Tag::TableHead | Tag::TableRow | Tag::TableCell => (),
