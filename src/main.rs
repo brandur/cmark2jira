@@ -5,7 +5,7 @@
 
 extern crate pulldown_cmark;
 
-use std::io::{self,Read};
+use std::io::{self, Read};
 
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
@@ -40,7 +40,7 @@ impl<'a> JIRARenderer<'a> {
             2 => {
                 self.append_newline_if_not_present();
                 self.buf.push('\n');
-            },
+            }
             _ => panic!("No more than two newlines should ever be queued"),
         }
         self.num_queued_newlines = 0;
@@ -75,16 +75,14 @@ impl<'a> JIRARenderer<'a> {
         match event {
             Event::Start(tag) => self.process_event_start(tag),
             Event::End(tag) => self.process_event_end(tag),
-            Event::Html(content) |
-            Event::InlineHtml(content) |
-            Event::Text(content) => {
+            Event::Html(content) | Event::InlineHtml(content) | Event::Text(content) => {
                 // Image titles come out rendered as text rather than as an
                 // attribute for an image tag, so we need to special case them
                 // so as not to print.
                 if !self.in_image {
                     self.append(&*format!("{}", content));
                 }
-            },
+            }
             Event::HardBreak => self.ensure_double_space(),
             Event::SoftBreak => self.ensure_single_space(),
 
@@ -101,7 +99,7 @@ impl<'a> JIRARenderer<'a> {
             Tag::BlockQuote => {
                 self.append("{quote}");
                 self.ensure_single_space();
-            },
+            }
             Tag::Code => self.append("{{"),
             Tag::CodeBlock(lang) => {
                 if lang.is_empty() {
@@ -110,33 +108,33 @@ impl<'a> JIRARenderer<'a> {
                     self.append(&*format!("{{code:{}}}", lang));
                 }
                 self.ensure_single_space();
-            },
+            }
             Tag::Emphasis => self.append("_"),
             Tag::Header(level) => self.append(&*format!("h{}. ", level)),
             Tag::Image(dest, _title) => {
                 self.append(&*format!("!{}!", dest));
                 self.in_image = true;
-            },
+            }
             Tag::Item => {
                 if self.in_ordered_list {
                     self.append("# ");
                 } else if self.in_unordered_list {
                     self.append("* ");
                 }
-            },
+            }
             Tag::Link(_dest, _title) => self.append("["),
             Tag::List(None) => {
                 self.in_unordered_list = true;
-            },
+            }
             Tag::List(_count) => {
                 self.in_ordered_list = true;
-            },
+            }
             Tag::Paragraph => (),
             // Four dashes instead of three. Way to show your clever individuality Atlassian!
             Tag::Rule => {
                 self.append("----");
                 self.num_queued_newlines = 2;
-            },
+            }
             Tag::Strong => self.append("*"),
 
             // Tables and footnotes need to be specially enabled in the
@@ -155,32 +153,32 @@ impl<'a> JIRARenderer<'a> {
                 self.ensure_single_space();
                 self.append("{quote}");
                 self.ensure_double_space();
-            },
+            }
             Tag::Code => self.append("}}"),
             Tag::CodeBlock(_lang) => {
                 self.ensure_single_space();
                 self.append("{code}");
                 self.ensure_double_space();
-            },
+            }
             Tag::Emphasis => self.append("_"),
             Tag::Header(_level) => {
                 self.ensure_double_space();
-            },
+            }
             Tag::Image(_dest, _title) => {
                 self.in_image = false;
-            },
+            }
             Tag::Item => {
                 self.ensure_single_space();
-            },
+            }
             Tag::Link(dest, _title) => self.append(&*format!("|{}]", dest)),
             Tag::List(None) => {
                 self.in_unordered_list = false;
                 self.ensure_double_space();
-            },
+            }
             Tag::List(_count) => {
                 self.in_ordered_list = false;
                 self.ensure_double_space();
-            },
+            }
             Tag::Rule => (),
             Tag::Paragraph => self.ensure_double_space(),
             Tag::Strong => self.append("*"),
@@ -210,7 +208,7 @@ fn render(s: &str) -> String {
         };
         renderer.run();
     }
-    return buf;
+    buf
 }
 
 fn main() {
