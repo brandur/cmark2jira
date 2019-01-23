@@ -55,7 +55,7 @@ impl<'a> JIRARenderer<'a> {
         }
     }
 
-    // Queues up a single newline to be written into the buffer. A newline is
+    // Queues up a double newline to be written into the buffer. A newline is
     // only appended in the case more content is added to the buffer so that
     // subsequent calls can control that spacing and so that we're not left
     // with trailing whitespace when we finish rendering.
@@ -63,7 +63,7 @@ impl<'a> JIRARenderer<'a> {
         self.num_queued_newlines = 2;
     }
 
-    // Queues up a double newline to be written into the buffer. Newlines are
+    // Queues up a single newline to be written into the buffer. Newlines are
     // only appended in the case more content is added to the buffer so that
     // subsequent calls can control that spacing and so that we're not left
     // with trailing whitespace when we finish rendering.
