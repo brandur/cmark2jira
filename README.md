@@ -1,4 +1,4 @@
-# cmark2jira [![Build Status](https://travis-ci.org/brandur/cmark2jira.svg?branch=master)](https://travis-ci.org/brandur/cmark2jira)
+# cmark2jira [![Build Status](https://github.com/brandur/cmark2jira/workflows/cmark2jira%20CI/badge.svg)](https://github.com/brandur/cmark2jira/actions)
 
 Translate good CommonMark (Markdown) into bad JIRA markup.
 This may be useful for anyone locked into Atlassian's
