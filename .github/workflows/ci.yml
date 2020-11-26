@@ -1,0 +1,39 @@
+name: cmark2jira CI
+
+on:
+  pull_request:
+  push:
+  schedule:
+    # once a day at 08:00
+    - cron: "0 8 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - nightly
+
+    steps:
+      - name: 'Checkout'
+        uses: actions/checkout@v2
+
+      - name: 'Install Rust'
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: ${{ matrix.toolchain }}
+            override: true
+            components: rustfmt, clippy
+
+      - name: 'Test'
+        run: cargo test
+
+      - name: 'Fmt'
+        run: cargo fmt --all -- --check
+
+      - name: 'Clippy'
+        run: cargo clippy -- -D warnings
