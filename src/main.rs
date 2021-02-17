@@ -10,7 +10,7 @@ use std::io::{self, Read};
 use pulldown_cmark::{Event, Options, Parser, Tag};
 
 /// Renderer that converts input CommonMark to output Jira markup.
-struct JIRARenderer<'a> {
+struct JiraRenderer<'a> {
     pub buf: &'a mut String,
     pub input: &'a str,
 
@@ -20,7 +20,7 @@ struct JIRARenderer<'a> {
     num_queued_newlines: i64,
 }
 
-impl<'a> JIRARenderer<'a> {
+impl<'a> JiraRenderer<'a> {
     /// Runs the renderer and converts input CommonMark to output Jira markup.
     /// The result is left in buf.
     pub fn run(&mut self) {
@@ -198,7 +198,7 @@ impl<'a> JIRARenderer<'a> {
 fn render(s: &str) -> String {
     let mut buf = String::with_capacity(s.len());
     {
-        let mut renderer = JIRARenderer {
+        let mut renderer = JiraRenderer {
             buf: &mut buf,
             in_image: false,
             in_ordered_list: false,
